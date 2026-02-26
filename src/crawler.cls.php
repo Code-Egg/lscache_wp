@@ -18,6 +18,7 @@ class Crawler extends Root {
 	const LOG_TAG = '🕸️';
 
 	const TYPE_REFRESH_MAP     = 'refresh_map';
+	const TYPE_GEN_WP_SITEMAP  = 'gen_wp_sitemap';
 	const TYPE_EMPTY           = 'empty';
 	const TYPE_BLACKLIST_EMPTY = 'blacklist_empty';
 	const TYPE_BLACKLIST_DEL   = 'blacklist_del';
@@ -1511,6 +1512,10 @@ class Crawler extends Root {
 				$this->cls( 'Crawler_Map' )->gen( true );
 				break;
 
+			case self::TYPE_GEN_WP_SITEMAP:
+				$this->_generate_wp_sitemap();
+				break;
+
 			case self::TYPE_EMPTY:
 				$this->cls( 'Crawler_Map' )->empty_map();
 				break;
@@ -1550,5 +1555,84 @@ class Crawler extends Root {
 		}
 
 		Admin::redirect();
+	}
+
+	/**
+	 * Generate crawler sitemap setting from WordPress sitemap providers.
+	 *
+	 * @since 7.8
+	 * @access private
+	 * @return void
+	 */
+	private function _generate_wp_sitemap() {
+		$sitemap_candidates = [
+			home_url( '/wp-sitemap.xml' ),
+			home_url( '/sitemap_index.xml' ),
+			home_url( '/sitemap.xml' ),
+		];
+
+		foreach ( $sitemap_candidates as $sitemap_url ) {
+			if ( ! $this->_is_valid_sitemap_url( $sitemap_url ) ) {
+				continue;
+			}
+
+			$this->cls( 'Conf' )->update_confs(
+				[
+					Base::O_CRAWLER_SITEMAP => $sitemap_url,
+				]
+			);
+			$this->cls( 'Crawler_Map' )->gen( true );
+
+			$msg = sprintf(
+				/* translators: %s: sitemap URL. */
+				__( 'WordPress sitemap detected and saved: %s', 'litespeed-cache' ),
+				'<code>' . esc_html( $sitemap_url ) . '</code>'
+			);
+			Admin_Display::success( $msg );
+			return;
+		}
+
+		$msg = sprintf(
+			/* translators: %s: list of attempted sitemap URLs. */
+			__( 'Failed to auto-detect a valid sitemap. Tried: %s', 'litespeed-cache' ),
+			'<code>' . esc_html( implode( ', ', $sitemap_candidates ) ) . '</code>'
+		);
+		Admin_Display::error( $msg );
+	}
+
+	/**
+	 * Validate if a URL returns a sitemap-like XML document.
+	 *
+	 * @since 7.8
+	 * @access private
+	 * @param string $url Sitemap URL.
+	 * @return bool
+	 */
+	private function _is_valid_sitemap_url( $url ) {
+		$response = wp_safe_remote_get(
+			$url,
+			[
+				'timeout'   => 15,
+				'sslverify' => false,
+			]
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return false;
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+		$body = wp_remote_retrieve_body( $response );
+		if ( 200 !== (int) $code || empty( $body ) ) {
+			return false;
+		}
+
+		$xml_object = simplexml_load_string( $body, null, LIBXML_NOCDATA );
+		if ( ! $xml_object ) {
+			return false;
+		}
+
+		$loc = $xml_object->xpath( '//*[local-name()="loc"]' );
+		return ! empty( $loc );
 	}
 }

@@ -58,6 +58,14 @@ $this->form_action();
 				<div class="litespeed-desc">
 					<?php esc_html_e( 'The crawler will use your XML sitemap or sitemap index. Enter the full URL to your sitemap here.', 'litespeed-cache' ); ?>
 					<?php Doc::one_per_line(); ?>
+					<p>
+						<a href="<?php echo esc_url( Utility::build_url( Router::ACTION_CRAWLER, Crawler::TYPE_GEN_WP_SITEMAP ) ); ?>" class="button button-secondary">
+							<?php esc_html_e( 'Generate from WordPress Sitemap', 'litespeed-cache' ); ?>
+						</a>
+					</p>
+					<p>
+						<?php esc_html_e( 'Auto-detects a valid WordPress sitemap URL, saves it to this field, and refreshes the crawler map.', 'litespeed-cache' ); ?>
+					</p>
 				</div>
 			</td>
 		</tr>
